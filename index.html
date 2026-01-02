@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Research Supply Portal</title>
+    <title>Research Supply Portal - Order System</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         .loader { border-top-color: #3b82f6; animation: spinner 1.5s linear infinite; }
@@ -12,189 +12,270 @@
         ::-webkit-scrollbar-track { background: #111827; }
         ::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #4b5563; }
-        .product-image { height: 180px; width: 100%; object-fit: cover; }
+        input[type="checkbox"] {
+            accent-color: #2563eb;
+        }
     </style>
 </head>
-<body class="bg-gray-900 text-gray-100 min-h-screen font-sans">
+<body class="bg-gray-900 text-gray-100 min-h-screen font-sans pb-20">
 
     <script>
         const API_URL = "https://script.google.com/macros/s/AKfycbyGVvjI36p-r9Hx_Qo3lxowckW1HkWP6uiFcwkvRn6KMr-5Osg1SRfUfhEFxlK95mIPPw/exec";
+        let cart = [];
+        let itemsData = [];
     </script>
 
-    <div class="max-w-5xl mx-auto py-12 px-4">
+    <div class="max-w-6xl mx-auto py-12 px-4">
+        <!-- Header -->
         <header class="text-center mb-12">
-            <h1 class="text-4xl font-extrabold text-white mb-6 tracking-tight">Research Materials Shop</h1>
-            <div class="bg-blue-900/30 border border-blue-500/50 p-6 rounded-xl max-w-2xl mx-auto mt-4">
-                <p class="text-blue-200 leading-relaxed italic">
+            <h1 class="text-5xl font-extrabold text-white mb-6 tracking-tight">Research Supply Portal</h1>
+            <div class="bg-blue-900/30 border border-blue-500/50 p-6 rounded-2xl max-w-3xl mx-auto">
+                <p class="text-blue-100 leading-relaxed italic text-lg">
                     "Welcome to my shop for all of your researching needs. All items sold here are strictly for research purposes and are not to be used on humans or animals."
                 </p>
             </div>
         </header>
 
-        <!-- Zone de notification -->
-        <div id="statusMessage" class="hidden mb-6 p-4 rounded-xl text-center font-medium shadow-lg border"></div>
+        <!-- Status Messages -->
+        <div id="statusMessage" class="hidden mb-8 p-4 rounded-xl text-center font-medium shadow-2xl border"></div>
 
-        <!-- Diagnostic (Visible seulement si erreur) -->
-        <div id="diagBox" class="hidden mb-10 p-6 bg-red-900/20 border border-red-500/50 rounded-xl">
-            <h3 class="text-red-400 font-bold mb-2">Connection Issues?</h3>
-            <ul class="text-sm text-gray-400 list-disc ml-5 space-y-1">
-                <li>Are you signed into multiple Google accounts? Try <strong>Incognito Mode</strong>.</li>
-                <li>Is the deployment set to <strong>"Anyone"</strong> (and NOT "Anyone with Google account")?</li>
-                <li>Have you authorized the script in the Apps Script editor?</li>
-            </ul>
-            <button onclick="loadStocks()" class="mt-4 text-xs bg-red-800 hover:bg-red-700 text-white px-4 py-2 rounded">Retry Connection</button>
+        <div class="flex flex-col lg:flex-row gap-10">
+            
+            <!-- Products List -->
+            <div class="flex-1">
+                <div id="loadingOverlay" class="flex flex-col justify-center items-center py-20">
+                    <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-700 h-12 w-12 mb-4"></div>
+                    <span class="text-gray-400 font-medium">Loading inventory...</span>
+                </div>
+
+                <div id="productsGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4 hidden">
+                    <!-- Injected by JS -->
+                </div>
+            </div>
+
+            <!-- Cart Sidebar -->
+            <div class="w-full lg:w-96">
+                <div class="bg-gray-800 p-6 rounded-2xl border border-gray-700 sticky top-10 shadow-2xl">
+                    <h2 class="text-2xl font-bold text-white mb-6 flex items-center justify-between">
+                        Your Bundle
+                        <span id="cartCount" class="bg-blue-600 text-xs px-2 py-1 rounded-full">0</span>
+                    </h2>
+                    
+                    <div id="cartList" class="space-y-4 max-h-[400px] overflow-y-auto mb-6 pr-2">
+                        <p class="text-gray-500 text-center py-4 italic">No materials selected.</p>
+                    </div>
+
+                    <div id="cartTotal" class="border-t border-gray-700 pt-4 hidden">
+                        <div class="flex justify-between items-center mb-6 px-1">
+                            <span class="text-gray-400 font-medium">Total Amount:</span>
+                            <span id="totalDisplay" class="text-2xl font-bold text-blue-400">0.00 €</span>
+                        </div>
+                        <button onclick="showCheckout()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl transition-all shadow-lg active:scale-95">
+                            Proceed to Checkout
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <!-- Chargement -->
-        <div id="loadingOverlay" class="flex flex-col justify-center items-center py-20">
-            <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-700 h-12 w-12 mb-4"></div>
-            <span class="text-gray-400 font-medium">Connecting to Research Database...</span>
-        </div>
-
-        <!-- Grille des produits -->
-        <div id="productsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 hidden"></div>
-
-        <!-- Formulaire de commande -->
-        <div id="orderSection" class="mt-16 bg-gray-800 p-8 rounded-2xl shadow-2xl border border-gray-700 hidden">
-            <h2 class="text-2xl font-semibold text-white mb-6 flex items-center">
-                <span class="bg-blue-600 w-2 h-8 rounded-full mr-3"></span>
-                Place Research Order
-            </h2>
-            <form id="orderForm" class="space-y-6">
-                <input type="hidden" id="selectedItemId" name="itemId">
-                
-                <div>
-                    <label class="block text-sm font-medium text-gray-400 mb-1">Selected Material</label>
-                    <input type="text" id="selectedItemName" readonly class="block w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-gray-300 focus:outline-none">
+        <!-- Checkout Modal -->
+        <div id="checkoutModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+            <div class="bg-gray-800 w-full max-w-2xl rounded-3xl border border-gray-700 p-8 shadow-2xl max-h-[95vh] overflow-y-auto">
+                <div class="flex justify-between items-center mb-6 border-b border-gray-700 pb-4">
+                    <h2 class="text-3xl font-bold text-white">Finalize Transmission</h2>
+                    <button onclick="hideCheckout()" class="text-gray-400 hover:text-white text-2xl">✕</button>
                 </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <label for="clientName" class="block text-sm font-medium text-gray-400 mb-1">Full Name</label>
-                        <input type="text" id="clientName" required placeholder="Dr. John Doe" class="block w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none transition">
+                <form id="orderForm" class="space-y-5">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-400 mb-1">Researcher Full Name *</label>
+                            <input type="text" id="clientName" required placeholder="Dr. John Doe" class="w-full bg-gray-900 border border-gray-700 rounded-xl p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none transition">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-400 mb-1">Contact Email *</label>
+                            <input type="email" id="clientEmail" required placeholder="lab@institute.org" class="w-full bg-gray-900 border border-gray-700 rounded-xl p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none transition">
+                        </div>
                     </div>
-                    <div>
-                        <label for="clientEmail" class="block text-sm font-medium text-gray-400 mb-1">Email Address</label>
-                        <input type="email" id="clientEmail" required placeholder="researcher@institute.com" class="block w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none transition">
-                    </div>
-                </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <label for="quantity" class="block text-sm font-medium text-gray-400 mb-1">Quantity</label>
-                        <input type="number" id="quantity" min="1" value="1" required class="block w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none transition">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-400 mb-1">Phone Number *</label>
+                            <input type="tel" id="clientPhone" required placeholder="+1 234 567 890" class="w-full bg-gray-900 border border-gray-700 rounded-xl p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none transition">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-400 mb-1">Telegram (Optional)</label>
+                            <input type="text" id="telegram" placeholder="@researcher_id" class="w-full bg-gray-900 border border-gray-700 rounded-xl p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none transition">
+                        </div>
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-400 mb-1">Purpose of Research</label>
-                        <select id="researchPurpose" class="block w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none">
-                            <option value="Laboratory Analysis">Laboratory Analysis</option>
-                            <option value="Educational Use">Educational Use</option>
-                            <option value="Chemical Synthesis">Chemical Synthesis</option>
-                        </select>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-400 mb-1">Signal (Optional)</label>
+                            <input type="text" id="signal" placeholder="+1..." class="w-full bg-gray-900 border border-gray-700 rounded-xl p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none transition">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-400 mb-1">Purpose of Research</label>
+                            <select id="researchPurpose" class="w-full bg-gray-900 border border-gray-700 rounded-xl p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none">
+                                <option>Laboratory Analysis</option>
+                                <option>Educational Use</option>
+                                <option>Chemical Synthesis</option>
+                            </select>
+                        </div>
                     </div>
-                </div>
 
-                <div>
-                    <label for="shippingAddress" class="block text-sm font-medium text-gray-400 mb-1">Shipping Address</label>
-                    <textarea id="shippingAddress" required rows="3" placeholder="Full address including city and postal code" class="block w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none transition"></textarea>
-                </div>
+                    <div>
+                        <label for="shippingAddress" class="block text-sm font-medium text-gray-400 mb-1">Shipping Address *</label>
+                        <textarea id="shippingAddress" required rows="3" placeholder="Full address for delivery" class="w-full bg-gray-900 border border-gray-700 rounded-xl p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none transition"></textarea>
+                    </div>
 
-                <div class="pt-4 flex flex-col sm:flex-row gap-4">
-                    <button type="submit" id="submitBtn" class="flex-1 bg-blue-600 text-white py-4 rounded-lg font-bold hover:bg-blue-500 transform active:scale-95 transition shadow-lg">Confirm Order</button>
-                    <button type="button" onclick="cancelOrder()" class="px-8 py-4 bg-gray-700 text-gray-300 rounded-lg font-medium hover:bg-gray-600 transition">Cancel</button>
-                </div>
-            </form>
+                    <!-- Acknowledgements Section -->
+                    <div class="space-y-4 pt-4 border-t border-gray-700">
+                        <div class="flex items-start gap-3">
+                            <input type="checkbox" id="ack1" required class="mt-1 h-5 w-5 flex-shrink-0 cursor-pointer">
+                            <label for="ack1" class="text-sm text-gray-300 cursor-pointer">
+                                <span class="font-bold text-white block mb-1">Acknowledgement 1 *</span>
+                                I acknowledge and agree that all items on this site are strictly for research purposes only, and not for human nor animal use.
+                            </label>
+                        </div>
+
+                        <div class="flex items-start gap-3">
+                            <input type="checkbox" id="ack2" required class="mt-1 h-5 w-5 flex-shrink-0 cursor-pointer">
+                            <label for="ack2" class="text-sm text-gray-300 cursor-pointer">
+                                <span class="font-bold text-white block mb-1">Acknowledgement 2 *</span>
+                                I understand that I must carefully review my full name and address before submitting this form. Delivery issues caused by incorrect or incomplete shipping details are of no responsibility to supplier. I also acknowledge that once the package is shipped, responsibility transfers to the carrier.
+                            </label>
+                        </div>
+
+                        <div class="flex items-start gap-3">
+                            <input type="checkbox" id="ack3" required class="mt-1 h-5 w-5 flex-shrink-0 cursor-pointer">
+                            <label for="ack3" class="text-sm text-gray-300 cursor-pointer">
+                                <span class="font-bold text-white block mb-1">Acknowledgement 3 *</span>
+                                I give consent on receiving a confirmation email, after submitting the form.
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-4 pt-6">
+                        <button type="submit" id="submitBtn" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl transition shadow-lg active:scale-95">Confirm Transmission</button>
+                        <button type="button" onclick="hideCheckout()" class="px-6 py-4 bg-gray-700 text-gray-300 rounded-xl hover:bg-gray-600 transition">Cancel</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 
     <script>
         async function loadStocks() {
-            const grid = document.getElementById('productsGrid');
-            const overlay = document.getElementById('loadingOverlay');
-            const diag = document.getElementById('diagBox');
-            
-            overlay.classList.remove('hidden');
-            grid.classList.add('hidden');
-            diag.classList.add('hidden');
-
             try {
-                // Utilisation de redirection explicite et mode cors pour GAS
-                const response = await fetch(`${API_URL}?action=getStocks`, {
-                    method: 'GET',
-                    redirect: 'follow'
-                });
-                
-                if (!response.ok) throw new Error(`Server returned ${response.status}`);
-                
+                const response = await fetch(`${API_URL}?action=getStocks`);
                 const data = await response.json();
-                const items = Array.isArray(data) ? data : (data.items || null);
-                
-                if (!items) throw new Error("Invalid data format received");
-
-                renderProducts(items);
-                overlay.classList.add('hidden');
-                grid.classList.remove('hidden');
+                itemsData = Array.isArray(data) ? data : [];
+                renderProducts(itemsData);
+                document.getElementById('loadingOverlay').classList.add('hidden');
+                document.getElementById('productsGrid').classList.remove('hidden');
             } catch (error) {
-                console.error("Connection Failed:", error);
-                overlay.classList.add('hidden');
-                diag.classList.remove('hidden');
-                showStatus("Network Error: Impossible to reach the research server.", "bg-red-900/50 text-red-200 border-red-500/50");
+                showStatus("Sync Error. Please check your connection.", "bg-red-900/50 text-red-200 border-red-500/50");
             }
         }
 
         function renderProducts(items) {
             const grid = document.getElementById('productsGrid');
             grid.innerHTML = '';
-            items.forEach((item) => {
+            items.forEach(item => {
                 const isOut = item.Stock <= 0;
                 const card = document.createElement('div');
-                card.className = `group overflow-hidden bg-gray-800 rounded-2xl shadow-lg border ${isOut ? 'border-red-900/50 opacity-75' : 'border-gray-700'} hover:border-blue-500/50 transition-all duration-300 transform hover:-translate-y-1`;
+                card.className = `bg-gray-800 rounded-xl border ${isOut ? 'border-red-900/30 opacity-70' : 'border-gray-700 hover:border-blue-600/50'} transition-all p-4 flex flex-col justify-between shadow-md`;
                 
-                const safeId = String(item.ID).replace(/'/g, "\\'");
-                const safeName = String(item.Nom).replace(/'/g, "\\'");
+                const safeName = item.Nom.replace(/'/g, "\\'");
 
                 card.innerHTML = `
-                    <img src="${item.Image}" alt="${item.Nom}" class="product-image grayscale group-hover:grayscale-0 transition-all duration-500" onerror="this.src='https://via.placeholder.com/300x200?text=No+Image'">
-                    <div class="p-6">
-                        <h3 class="text-xl font-bold text-white mb-2 group-hover:text-blue-400 transition-colors">${item.Nom}</h3>
-                        <div class="space-y-2 mb-6 text-sm">
-                            <div class="flex justify-between items-center">
-                                <span class="text-gray-400">Inventory:</span>
-                                <span class="font-mono ${isOut ? 'text-red-500 font-bold' : 'text-green-400'}">${item.Stock} units</span>
-                            </div>
-                            ${item.ProchaineLivraison ? `<div class="bg-gray-900/50 p-2 rounded border border-gray-700 text-xs text-gray-400">Restock scheduled: <span class="text-blue-300">${item.ProchaineLivraison}</span></div>` : ''}
+                    <div class="mb-4">
+                        <div class="flex justify-between items-start mb-1">
+                            <h3 class="text-lg font-bold text-white leading-tight">${item.Nom}</h3>
+                            <span class="text-blue-400 font-bold ml-2 whitespace-nowrap">${parseFloat(item.Price).toFixed(2)} €</span>
                         </div>
-                        <button 
-                            onclick="selectItem('${safeId}', '${safeName}', ${Number(item.Stock)})" 
-                            ${isOut ? 'disabled' : ''} 
-                            class="w-full py-3 rounded-xl font-bold transition-all ${isOut ? 'bg-gray-700 text-gray-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-500'}"
-                        >
-                            ${isOut ? 'Unavailable' : 'Select Material'}
-                        </button>
+                        <div class="flex flex-wrap gap-x-4 gap-y-1">
+                            <span class="text-[11px] font-mono ${isOut ? 'text-red-500' : 'text-green-500'} uppercase tracking-wider">Stock: ${item.Stock}</span>
+                            ${item.ProchaineLivraison ? `<span class="text-[11px] text-gray-500 italic">Next: ${item.ProchaineLivraison}</span>` : ''}
+                        </div>
                     </div>
+                    <button 
+                        onclick="addToCart('${item.ID}', '${safeName}', ${item.Stock}, ${item.Price})"
+                        ${isOut ? 'disabled' : ''}
+                        class="w-full py-2.5 rounded-lg text-sm font-bold transition ${isOut ? 'bg-gray-700 text-gray-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-500 active:scale-95'}"
+                    >
+                        ${isOut ? 'Unavailable' : 'Add to Bundle'}
+                    </button>
                 `;
                 grid.appendChild(card);
             });
         }
 
-        function selectItem(id, name, stock) {
-            document.getElementById('selectedItemId').value = id;
-            document.getElementById('selectedItemName').value = name;
-            document.getElementById('quantity').max = stock;
-            document.getElementById('quantity').value = 1;
-            document.getElementById('orderSection').classList.remove('hidden');
-            document.getElementById('orderSection').scrollIntoView({ behavior: 'smooth' });
+        function addToCart(id, name, maxStock, price) {
+            const existing = cart.find(i => i.id === id);
+            if (maxStock <= 0) {
+                showStatus(`Item "${name}" is currently unavailable.`, "bg-red-900/50 text-red-200 border-red-500/50");
+                return;
+            }
+
+            if (existing) {
+                if (existing.quantity < maxStock) {
+                    existing.quantity++;
+                } else {
+                    showStatus("Cannot exceed available stock.", "bg-blue-900/50 text-blue-200 border-blue-500/50");
+                    return;
+                }
+            } else {
+                cart.push({ id, name, quantity: 1, max: maxStock, price: parseFloat(price) });
+            }
+            updateCartUI();
         }
 
-        function cancelOrder() {
-            document.getElementById('orderSection').classList.add('hidden');
-            document.getElementById('orderForm').reset();
+        function removeFromCart(id) {
+            cart = cart.filter(i => i.id !== id);
+            updateCartUI();
         }
+
+        function updateCartUI() {
+            const list = document.getElementById('cartList');
+            const totalSection = document.getElementById('cartTotal');
+            const totalDisplay = document.getElementById('totalDisplay');
+            const count = document.getElementById('cartCount');
+            
+            const totalItems = cart.reduce((acc, curr) => acc + curr.quantity, 0);
+            const totalPrice = cart.reduce((acc, curr) => acc + (curr.quantity * curr.price), 0);
+            
+            count.textContent = totalItems;
+            totalDisplay.textContent = `${totalPrice.toFixed(2)} €`;
+
+            if (cart.length === 0) {
+                list.innerHTML = '<p class="text-gray-500 text-center py-4 italic">No materials selected.</p>';
+                totalSection.classList.add('hidden');
+                return;
+            }
+
+            totalSection.classList.remove('hidden');
+            list.innerHTML = cart.map(item => `
+                <div class="flex justify-between items-center bg-gray-900/50 p-3 rounded-xl border border-gray-700">
+                    <div class="flex-1">
+                        <p class="text-white font-semibold text-sm">${item.name}</p>
+                        <p class="text-[10px] text-gray-400">Qty: ${item.quantity} × ${item.price.toFixed(2)} €</p>
+                    </div>
+                    <div class="text-right flex items-center gap-3">
+                        <span class="text-xs font-bold text-blue-400">${(item.quantity * item.price).toFixed(2)} €</span>
+                        <button onclick="removeFromCart('${item.id}')" class="text-red-500 hover:text-red-400 px-2 text-lg">✕</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function showCheckout() { document.getElementById('checkoutModal').classList.remove('hidden'); }
+        function hideCheckout() { document.getElementById('checkoutModal').classList.add('hidden'); }
 
         function showStatus(msg, classes) {
             const el = document.getElementById('statusMessage');
             el.textContent = msg;
-            el.className = `mb-6 p-4 rounded-xl text-center font-medium shadow-lg ${classes}`;
+            el.className = `mb-8 p-4 rounded-xl text-center font-medium shadow-2xl border ${classes}`;
             el.classList.remove('hidden');
             window.scrollTo({ top: 0, behavior: 'smooth' });
             setTimeout(() => el.classList.add('hidden'), 8000);
@@ -203,36 +284,47 @@
         document.getElementById('orderForm').onsubmit = async (e) => {
             e.preventDefault();
             const btn = document.getElementById('submitBtn');
+            const originalText = btn.textContent;
             btn.disabled = true;
-            btn.textContent = "Processing Order...";
+            btn.textContent = "Processing...";
+
+            const totalAmount = cart.reduce((acc, curr) => acc + (curr.quantity * curr.price), 0).toFixed(2);
 
             const formData = {
                 action: 'addOrder',
                 nom: document.getElementById('clientName').value,
                 email: document.getElementById('clientEmail').value,
+                phone: document.getElementById('clientPhone').value,
+                telegram: document.getElementById('telegram').value,
+                signal: document.getElementById('signal').value,
                 address: document.getElementById('shippingAddress').value,
                 purpose: document.getElementById('researchPurpose').value,
-                itemId: document.getElementById('selectedItemId').value,
-                quantite: parseInt(document.getElementById('quantity').value)
+                totalAmount: totalAmount,
+                cart: cart
             };
 
             try {
-                // Requête simple sans headers complexes pour éviter preflight OPTIONS
-                await fetch(API_URL, { 
-                    method: 'POST',
-                    mode: 'no-cors', // Mode plus robuste pour GAS POST
-                    body: JSON.stringify(formData) 
-                });
+                const response = await fetch(API_URL, { method: 'POST', body: JSON.stringify(formData) });
+                const result = await response.json();
                 
-                showStatus("Request submitted. A new research log will be generated shortly.", "bg-green-900/50 text-green-200 border-green-500/50");
-                cancelOrder();
-                setTimeout(loadStocks, 3000);
+                if (result.result === "success") {
+                    showStatus("Transmission complete. Order logged in database.", "bg-green-900/50 text-green-200 border-green-500/50");
+                    cart = [];
+                    updateCartUI();
+                    hideCheckout();
+                    loadStocks();
+                } else {
+                    throw new Error(result.message);
+                }
             } catch (error) {
-                showStatus("Communication lag detected. Please check your research sheet in a few moments.", "bg-blue-900/50 text-blue-200 border-blue-500/50");
-                cancelOrder();
+                showStatus("Transmission initialized. Please check your research log in a few seconds.", "bg-blue-900/50 text-blue-200 border-blue-500/50");
+                cart = [];
+                updateCartUI();
+                hideCheckout();
+                setTimeout(loadStocks, 3000);
             } finally {
                 btn.disabled = false;
-                btn.textContent = "Confirm Order";
+                btn.textContent = originalText;
             }
         };
 
